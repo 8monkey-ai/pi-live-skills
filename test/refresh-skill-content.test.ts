@@ -8,11 +8,13 @@ import { refreshSkillContent } from "../src/refresh-skill-content.ts";
 type Messages = ContextEvent["messages"];
 
 const skillPath = "/skills/demo/SKILL.md";
+const blockPath = "/skills/block/SKILL.md";
 const homeSkill = join(homedir(), "skills/home/SKILL.md");
 const files: Record<string, string> = {
 	[skillPath]: "new text",
 	[homeSkill]: "home text",
 	"/notes.md": "new notes",
+	[blockPath]: "---\nname: block\ndescription: d\n---\n\nnew body\n",
 };
 const readFile = (path: string) => files[path];
 const isSkillFile = (path: string) => path.endsWith("SKILL.md");
@@ -131,4 +133,53 @@ test("the result is a new array and the input stays as it is", () => {
 	const refreshed = refresh(messages);
 	assert.notEqual(refreshed, messages);
 	assert.deepEqual(resultText(messages), [{ type: "text", text: "old text" }]);
+});
+
+function userMessage(content: string): Messages[number] {
+	return { role: "user", content, timestamp: 0 };
+}
+
+function userText(messages: Messages) {
+	const message = messages[0];
+	assert.equal(message?.role, "user");
+	return message.content;
+}
+
+function skillBlock(body: string) {
+	return `<skill name="block" location="${blockPath}">\nReferences are relative to /old.\n\n${body}\n</skill>`;
+}
+
+const freshBlock = `<skill name="block" location="${blockPath}">\nReferences are relative to /skills/block.\n\nnew body\n</skill>`;
+
+test("a skill block gets the new body and keeps the arguments", () => {
+	const messages = refresh([userMessage(`${skillBlock("old body")}\n\nmy arguments`)]);
+	assert.equal(userText(messages), `${freshBlock}\n\nmy arguments`);
+});
+
+test("a skill block in a text part gets the new body", () => {
+	const message: Messages[number] = {
+		role: "user",
+		content: [{ type: "text", text: skillBlock("old body") }],
+		timestamp: 0,
+	};
+	assert.deepEqual(userText(refresh([message])), [{ type: "text", text: freshBlock }]);
+});
+
+test("a skill block of a deleted file keeps the wrapper with the notice", () => {
+	const location = "/skills/gone/SKILL.md";
+	const block = `<skill name="gone" location="${location}">\nReferences are relative to /skills/gone.\n\nold body\n</skill>\n\nargs`;
+	assert.equal(
+		userText(refresh([userMessage(block)])),
+		`<skill name="gone" location="${location}">\nReferences are relative to /skills/gone.\n\nThis skill file no longer exists.\n</skill>\n\nargs`,
+	);
+});
+
+test("a user message without a skill block keeps its message object", () => {
+	const message = userMessage("hello");
+	assert.equal(refresh([message])[0], message);
+});
+
+test("a skill block that matches the disk keeps its message object", () => {
+	const message = userMessage(freshBlock);
+	assert.equal(refresh([message])[0], message);
 });

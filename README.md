@@ -13,6 +13,7 @@ pi install npm:@8monkey/pi-live-skills
 Before each model request, the extension changes the request. The session file keeps the original messages.
 
 - **`read` results:** each full `read` of a `SKILL.md` file gets the current text of the file, also when the file is now larger than the `read` limits. If the file was deleted, the text becomes `This skill file no longer exists.`
+- **`/skill:name` blocks:** each `<skill>` block gets the current body of its file. The block keeps its wrapper and your arguments. If the file was deleted, the body becomes `This skill file no longer exists.`
 
 ## Limits
 
