@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"noEmit": true,
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"types": ["node"],
+		// The pi package .d.ts files do not pass a NodeNext check.
+		"skipLibCheck": true
+	},
+	"include": ["src", "test"]
+}
