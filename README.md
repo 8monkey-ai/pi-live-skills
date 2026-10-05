@@ -1,6 +1,6 @@
 # pi-live-skills
 
-Keeps the model's copy of your skills, context files, `SYSTEM.md` and `APPEND_SYSTEM.md` the same as the files on disk. Edit a skill during a session and the model sees the new version, with no `/reload`.
+Edit your skills and project instructions during a pi session. The model uses the new version at your next prompt, with no `/reload` and no new session.
 
 ## Install
 
@@ -8,32 +8,43 @@ Keeps the model's copy of your skills, context files, `SYSTEM.md` and `APPEND_SY
 pi install npm:@8monkey/pi-live-skills
 ```
 
-## How it works
+## What you get
 
-Before each model request, the extension changes the skill text in the request. The session file keeps the original messages.
+- **Skill edits take effect immediately.** Change a skill that the model already loaded, and the model works from the new text, not from the old copy in the chat history. This applies to skills that the model read and to skills that you start with `/skill:name`.
+- **New skills appear.** Add a skill to a skill folder or to your settings, and the model can find it and use it.
+- **Deleted skills go away.** Remove a skill, and the model stops seeing it. If the model loaded it earlier, the model gets a note that the file no longer exists.
+- **Project instructions stay current.** Edit `AGENTS.md`, `CLAUDE.md`, `SYSTEM.md` or `APPEND_SYSTEM.md`, and the model follows the new rules.
+- **Your session history stays as it was.** The session file keeps the original messages. Only the text that pi sends to the model changes.
 
-- **`read` results:** each full `read` of a skill file gets the current text of the file, also when the file is now larger than the `read` limits. If the file was deleted, the text becomes `This skill file no longer exists.`
-- **`/skill:name` blocks:** each `<skill>` block gets the current body of its file. The block keeps its wrapper and your arguments. If the file was deleted, the body becomes `This skill file no longer exists.`
+Your choices at startup still apply. If you start pi with `--no-skills`, `--no-context-files`, `--system-prompt` or `--append-system-prompt`, that part stays as it is. Project skills and project files in `.pi/` apply only when you trust the project.
 
-At the start of each prompt, the extension reads these parts from disk again. Pi then sends the changed parts of the system prompt to the model.
+## Example
 
-- **Context files:** `AGENTS.override.md`, `AGENTS.md` or `CLAUDE.md` from the agent folder and from each parent folder of the project, with files added and removed.
-- **System prompt files:** `SYSTEM.md` and `APPEND_SYSTEM.md`. The project files in `.pi/` apply only when the project is trusted.
-- **Skill list:** the name, description and location of each skill. Skills that you add to a skill folder or to the settings appear. A skill whose file was deleted drops out. Project skills and project settings apply only when the project is trusted.
+You write a skill and test it in the same session:
 
-A skill file is a file named `SKILL.md`, or a file in the skill list.
+1. Ask the model to do a task with the skill.
+2. Edit `SKILL.md` in your editor.
+3. Ask again. The model uses the edited skill, and you keep the rest of the conversation.
 
-If you start pi with `--no-skills`, `--no-context-files`, `--system-prompt` or `--append-system-prompt`, that part of the prompt stays as it is.
+## When you still need `/reload`
+
+- To start a new or renamed skill with `/skill:name`.
+- To remove a skill that you turned off in the settings, while its file is still on disk.
+- To add new skills from a folder that you gave with `--skill`.
 
 ## Limits
 
-- Partial reads (`offset`, `limit` or a truncated result) and failed reads stay as they are.
-- Skill text that the model read through `bash` stays as it is.
-- A change to the system prompt during a tool loop reaches the model at your next prompt.
-- Steer and follow-up messages that you queue during a run do not refresh the system prompt.
-- A skill that you turn off in the settings stays in the skill list until `/reload`, while its file is on disk.
-- `/skill:name` commands for added or renamed skills need `/reload`.
-- New skills in a folder that you give with `--skill` need `/reload`.
+- Edits to project instructions or to the skill list reach the model at your next prompt, not during a run that is in progress.
+- The model may see that its earlier replies used the old text, and it can say so.
+- The first request after a change can cost more, because the provider prompt cache restarts from the changed part.
+- Skill text that the model read only in part, or through `bash`, stays as it is.
+
+## How it works
+
+Pi loads skills, context files and the system prompt at startup, and it does not update messages that are already in the chat. This extension fixes that in two places:
+
+- Before each model request, it puts the current text of each skill into the skill messages of the request.
+- At the start of each prompt, it reads the skill list, the context files and the system prompt files from disk again. Pi then sends only the parts that changed.
 
 ## Development
 
