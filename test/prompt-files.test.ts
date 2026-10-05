@@ -75,7 +75,7 @@ test("a trusted project uses .pi/SYSTEM.md and an untrusted project ignores it",
 	);
 });
 
-test("a deleted APPEND_SYSTEM.md gives an empty append prompt", () => {
+test("deleted system prompt files give no system prompt and an empty append prompt", () => {
 	const { cwd, agentDir } = makeDirs();
 	const options = refresh({ cwd, customPrompt: "old", appendSystemPrompt: "old" }, agentDir);
 	assert.equal(options.customPrompt, undefined);

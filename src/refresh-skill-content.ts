@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import {
 	type ContextEvent,
 	parseSkillBlock,
@@ -44,17 +44,11 @@ function findFullReadPaths(messages: Messages, cwd: string) {
 			if (block.type !== "toolCall" || block.name !== "read") continue;
 			const { path, offset, limit } = block.arguments;
 			if (typeof path !== "string" || offset !== undefined || limit !== undefined) continue;
-			paths.set(block.id, resolveReadPath(path, cwd));
+			const expanded = path.replace(/^@/, "").replace(/^~(?=\/|$)/, () => homedir());
+			paths.set(block.id, resolve(cwd, expanded));
 		}
 	}
 	return paths;
-}
-
-function resolveReadPath(path: string, cwd: string) {
-	const withoutAt = path.startsWith("@") ? path.slice(1) : path;
-	if (withoutAt === "~") return homedir();
-	if (withoutAt.startsWith("~/")) return join(homedir(), withoutAt.slice(2));
-	return resolve(cwd, withoutAt);
 }
 
 function isTruncated(details: unknown) {

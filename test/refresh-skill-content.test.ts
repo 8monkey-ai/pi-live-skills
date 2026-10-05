@@ -60,7 +60,7 @@ function readExchange(
 	return [readCall("call-1", args), readResult("call-1", options)];
 }
 
-function resultText(messages: Messages) {
+function resultContent(messages: Messages) {
 	const result = messages[1];
 	assert.equal(result?.role, "toolResult");
 	return result.content;
@@ -70,9 +70,28 @@ function refresh(messages: Messages, cwd = "/", skills: Skills = []) {
 	return refreshSkillContent(messages, cwd, skills, readFile);
 }
 
-test("a full read of a skill file gets the disk text", () => {
-	const messages = refresh(readExchange({ path: skillPath }));
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "new text" }]);
+test("a full read of a skill file gets the disk text in a new message", () => {
+	const messages = readExchange({ path: skillPath });
+	assert.deepEqual(resultContent(refresh(messages)), [{ type: "text", text: "new text" }]);
+	assert.deepEqual(resultContent(messages), [{ type: "text", text: "old text" }]);
+});
+
+test("each read result pairs with the read call of the same id", () => {
+	const messages: Messages = [
+		readCall("full", { path: skillPath }),
+		readCall("partial", { path: skillPath, limit: 1 }),
+		readResult("partial", {}),
+		readResult("full", {}),
+		readResult("orphan", {}),
+	];
+	const texts = refresh(messages).map((message) =>
+		message.role === "toolResult" ? message.content : undefined,
+	);
+	assert.deepEqual(texts.slice(2), [
+		[{ type: "text", text: "old text" }],
+		[{ type: "text", text: "new text" }],
+		[{ type: "text", text: "old text" }],
+	]);
 });
 
 test("partial reads stay as they are", () => {
@@ -81,23 +100,25 @@ test("partial reads stay as they are", () => {
 		{ path: skillPath, offset: 2 },
 	];
 	for (const args of partialArgs) {
-		assert.deepEqual(resultText(refresh(readExchange(args))), [{ type: "text", text: "old text" }]);
+		assert.deepEqual(resultContent(refresh(readExchange(args))), [
+			{ type: "text", text: "old text" },
+		]);
 	}
 });
 
 test("a truncated read stays as it is", () => {
 	const messages = refresh(readExchange({ path: skillPath }, { truncated: true }));
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "old text" }]);
+	assert.deepEqual(resultContent(messages), [{ type: "text", text: "old text" }]);
 });
 
 test("a failed read stays as it is", () => {
 	const messages = refresh(readExchange({ path: skillPath }, { isError: true }));
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "old text" }]);
+	assert.deepEqual(resultContent(messages), [{ type: "text", text: "old text" }]);
 });
 
 test("a read of a file that is not a skill stays as it is", () => {
 	const messages = refresh(readExchange({ path: "/notes.md" }));
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "old text" }]);
+	assert.deepEqual(resultContent(messages), [{ type: "text", text: "old text" }]);
 });
 
 test("a read that matches the disk keeps its message object", () => {
@@ -112,7 +133,7 @@ test("a read that matches the disk keeps its message object", () => {
 
 test("a deleted skill file gives the notice", () => {
 	const messages = refresh(readExchange({ path: "/skills/gone/SKILL.md" }));
-	assert.deepEqual(resultText(messages), [
+	assert.deepEqual(resultContent(messages), [
 		{ type: "text", text: "This skill file no longer exists." },
 	]);
 });
@@ -124,22 +145,19 @@ test("relative, @ and ~ paths resolve", () => {
 		{ path: "~/skills/home/SKILL.md", cwd: "/", text: "home text" },
 	];
 	for (const { path, cwd, text } of cases) {
-		assert.deepEqual(resultText(refresh(readExchange({ path }), cwd)), [{ type: "text", text }]);
+		assert.deepEqual(resultContent(refresh(readExchange({ path }), cwd)), [{ type: "text", text }]);
 	}
-});
-
-test("the result is a new array and the input stays as it is", () => {
-	const messages = readExchange({ path: skillPath });
-	const refreshed = refresh(messages);
-	assert.notEqual(refreshed, messages);
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "old text" }]);
 });
 
 function userMessage(content: string): Messages[number] {
 	return { role: "user", content, timestamp: 0 };
 }
 
-function userText(messages: Messages) {
+function userParts(text: string): Messages[number] {
+	return { role: "user", content: [{ type: "text", text }], timestamp: 0 };
+}
+
+function userContent(messages: Messages) {
 	const message = messages[0];
 	assert.equal(message?.role, "user");
 	return message.content;
@@ -153,48 +171,45 @@ const freshBlock = `<skill name="block" location="${blockPath}">\nReferences are
 
 test("a skill block gets the new body and keeps the arguments", () => {
 	const messages = refresh([userMessage(`${skillBlock("old body")}\n\nmy arguments`)]);
-	assert.equal(userText(messages), `${freshBlock}\n\nmy arguments`);
+	assert.equal(userContent(messages), `${freshBlock}\n\nmy arguments`);
 });
 
 test("a skill block in a text part gets the new body", () => {
-	const message: Messages[number] = {
-		role: "user",
-		content: [{ type: "text", text: skillBlock("old body") }],
-		timestamp: 0,
-	};
-	assert.deepEqual(userText(refresh([message])), [{ type: "text", text: freshBlock }]);
+	const messages = refresh([userParts(skillBlock("old body"))]);
+	assert.deepEqual(userContent(messages), [{ type: "text", text: freshBlock }]);
 });
 
 test("a skill block of a deleted file keeps the wrapper with the notice", () => {
 	const location = "/skills/gone/SKILL.md";
 	const block = `<skill name="gone" location="${location}">\nReferences are relative to /skills/gone.\n\nold body\n</skill>\n\nargs`;
 	assert.equal(
-		userText(refresh([userMessage(block)])),
+		userContent(refresh([userMessage(block)])),
 		`<skill name="gone" location="${location}">\nReferences are relative to /skills/gone.\n\nThis skill file no longer exists.\n</skill>\n\nargs`,
 	);
 });
 
-test("a user message without a skill block keeps its message object", () => {
-	const message = userMessage("hello");
-	assert.equal(refresh([message])[0], message);
-});
-
-test("a skill block that matches the disk keeps its message object", () => {
-	const message = userMessage(freshBlock);
-	assert.equal(refresh([message])[0], message);
+test("a user message with no block or a block that matches the disk keeps its object", () => {
+	for (const message of [
+		userMessage("hello"),
+		userMessage(freshBlock),
+		userParts("hello"),
+		userParts(freshBlock),
+	]) {
+		assert.equal(refresh([message])[0], message);
+	}
 });
 
 test("a read of a loaded skill file with another name gets the disk text", () => {
 	const skills = [{ filePath: "/skills/flat.md", baseDir: "/skills" }];
 	const messages = refresh(readExchange({ path: "/skills/flat.md" }), "/", skills);
-	assert.deepEqual(resultText(messages), [{ type: "text", text: "flat text" }]);
+	assert.deepEqual(resultContent(messages), [{ type: "text", text: "flat text" }]);
 });
 
 test("a skill block of a loaded skill uses the base folder of the skill", () => {
 	const skills = [{ filePath: blockPath, baseDir: "/skills" }];
 	const messages = refresh([userMessage(skillBlock("old body"))], "/", skills);
 	assert.equal(
-		userText(messages),
+		userContent(messages),
 		`<skill name="block" location="${blockPath}">\nReferences are relative to /skills.\n\nnew body\n</skill>`,
 	);
 });

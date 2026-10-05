@@ -10,7 +10,8 @@ import { refreshSkills } from "../src/skills.ts";
 const home = process.env.HOME;
 process.env.HOME = mkdtempSync(join(tmpdir(), "skills-home-"));
 after(() => {
-	process.env.HOME = home;
+	if (home === undefined) delete process.env.HOME;
+	else process.env.HOME = home;
 });
 
 function writeSkill(dir: string, description: string, name = "demo") {
