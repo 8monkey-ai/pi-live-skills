@@ -1,6 +1,6 @@
 {
 	"name": "@8monkey/pi-live-skills",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Pi extension that keeps skills, context files and system prompt files in the model context the same as on disk.",
 	"license": "MIT",
 	"type": "module",
