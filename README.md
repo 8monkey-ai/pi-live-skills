@@ -8,6 +8,17 @@ Keeps the model's copy of your skills, context files, `SYSTEM.md` and `APPEND_SY
 pi install npm:@8monkey/pi-live-skills
 ```
 
+## How it works
+
+Before each model request, the extension changes the request. The session file keeps the original messages.
+
+- **`read` results:** each full `read` of a `SKILL.md` file gets the current text of the file, also when the file is now larger than the `read` limits. If the file was deleted, the text becomes `This skill file no longer exists.`
+
+## Limits
+
+- Partial reads (`offset`, `limit` or a truncated result) and failed reads stay as they are.
+- Skill text that the model read through `bash` stays as it is.
+
 ## Development
 
 ```bash
