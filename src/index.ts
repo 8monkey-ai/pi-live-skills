@@ -13,16 +13,16 @@ export default function (pi: ExtensionAPI) {
 	const flags = parseArgs(process.argv.slice(2));
 	let skills: Skill[] = [];
 
-	pi.on("before_agent_start", (event, ctx) => {
+	pi.on("before_agent_start", async (event, ctx) => {
 		const options = event.systemPromptOptions;
-		const agentDir = getAgentDir();
-		refreshPromptFiles(options, {
-			agentDir,
+		const environment = {
+			agentDir: getAgentDir(),
 			flags,
 			projectTrusted: ctx.isProjectTrusted(),
 			readFile: readTextFile,
-		});
-		refreshSkills(options, agentDir, flags);
+		};
+		refreshPromptFiles(options, environment);
+		await refreshSkills(options, environment);
 		skills = options.skills;
 	});
 
