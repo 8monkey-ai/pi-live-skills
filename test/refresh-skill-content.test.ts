@@ -6,6 +6,7 @@ import type { ContextEvent } from "@earendil-works/pi-coding-agent";
 import { refreshSkillContent } from "../src/refresh-skill-content.ts";
 
 type Messages = ContextEvent["messages"];
+type Skills = Parameters<typeof refreshSkillContent>[2];
 
 const skillPath = "/skills/demo/SKILL.md";
 const blockPath = "/skills/block/SKILL.md";
@@ -14,11 +15,10 @@ const files: Record<string, string> = {
 	[skillPath]: "new text",
 	[homeSkill]: "home text",
 	"/notes.md": "new notes",
+	"/skills/flat.md": "flat text",
 	[blockPath]: "---\nname: block\ndescription: d\n---\n\nnew body\n",
 };
 const readFile = (path: string) => files[path];
-const isSkillFile = (path: string) => path.endsWith("SKILL.md");
-
 function readCall(id: string, args: Record<string, string | number>): Messages[number] {
 	return {
 		role: "assistant",
@@ -66,8 +66,8 @@ function resultText(messages: Messages) {
 	return result.content;
 }
 
-function refresh(messages: Messages, cwd = "/") {
-	return refreshSkillContent(messages, cwd, isSkillFile, readFile);
+function refresh(messages: Messages, cwd = "/", skills: Skills = []) {
+	return refreshSkillContent(messages, cwd, skills, readFile);
 }
 
 test("a full read of a skill file gets the disk text", () => {
@@ -182,4 +182,19 @@ test("a user message without a skill block keeps its message object", () => {
 test("a skill block that matches the disk keeps its message object", () => {
 	const message = userMessage(freshBlock);
 	assert.equal(refresh([message])[0], message);
+});
+
+test("a read of a loaded skill file with another name gets the disk text", () => {
+	const skills = [{ filePath: "/skills/flat.md", baseDir: "/skills" }];
+	const messages = refresh(readExchange({ path: "/skills/flat.md" }), "/", skills);
+	assert.deepEqual(resultText(messages), [{ type: "text", text: "flat text" }]);
+});
+
+test("a skill block of a loaded skill uses the base folder of the skill", () => {
+	const skills = [{ filePath: blockPath, baseDir: "/skills" }];
+	const messages = refresh([userMessage(skillBlock("old body"))], "/", skills);
+	assert.equal(
+		userText(messages),
+		`<skill name="block" location="${blockPath}">\nReferences are relative to /skills.\n\nnew body\n</skill>`,
+	);
 });
